@@ -85,19 +85,24 @@ class GCNResnet(nn.Module):
         if mode == 'explain':
             if adj is None:
                 self.A.requires_grad = True
-                adj = gen_adj(self.A.float())
+                A = gen_adj(self.A.float())
+            else:
+                A = gen_adj(adj.float())
         else: 
-            adj = gen_adj(self.A).detach()
+            if adj is None:
+                A = gen_adj(self.A).detach()
+            else:
+                A = gen_adj(adj.float()).detach()
         
         
-        x = self.gc1(inp, adj)
+        x = self.gc1(inp, A)
         x = self.relu(x)
-        x = self.gc2(x, adj)
+        x = self.gc2(x, A)
         x = x.transpose(0, 1)
         x = torch.matmul(feature, x)
-        #x= F.softmax(x)
-        if mode == 'explain':
-            x=torch.sigmoid(x)
+        # if mode == 'explain':
+        #     x=torch.sigmoid(x)
+            # x = nn.Softmax(dim=1)(x)
         return x
     
     def get_config_optim(self, lr, lrp):
@@ -113,7 +118,7 @@ def gcn_resnet101(num_classes, t, pretrained=True, in_channel=300, adj_file=None
     return GCNResnet(model, num_classes, t=t, adj_file= adj_file, in_channel=in_channel, interpret_mode=interpret_mode)
 
 
-def gen_A(num_classes, t, adj_file):
+def gen_A(num_classes, t, adj_file, p=0.25):
     import pickle
     result = pickle.load(open(adj_file, 'rb'))
     _adj = result['adj']
@@ -122,8 +127,8 @@ def gen_A(num_classes, t, adj_file):
     _adj = _adj / _nums
     _adj[_adj < t] = 0
     _adj[_adj >= t] = 1
-    _adj = _adj * 0.25 / (_adj.sum(0, keepdims=True) + 1e-6)
-    _adj = _adj + np.identity(num_classes, np.int)
+    # _adj = _adj * p / (_adj.sum(0, keepdims=True) + 1e-6)
+    # _adj = _adj + np.identity(num_classes, np.int)
     return _adj
 
 def gen_adj(A):

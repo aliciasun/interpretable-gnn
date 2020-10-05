@@ -54,14 +54,11 @@ def show_graph_with_labels(adjacency_matrix, mylabels, link_type):
     #print(gr.edges.data())
     for comm in set(partition.values()):
         key_list=[]
-        # print("Community %d"%comm)
+
         for key in partition:
             if partition[key] == comm:
-                key_list.append(key)
-        for k,a in enumerate(key_list):
-            key_list[k]=utils.get_key(label_dic,a)
+                key_list.append(idx2label[key])
             
-    
     
     nx.draw(gr,pos, node_size=50,cmap=plt.cm.RdYlBu, node_color=list(partition.values()))
     nx.draw_networkx_edges(gr, pos, arrowstyle='->',arrowsize=10,edge_cmap=plt.cm.Greys, width=weights)
@@ -159,7 +156,8 @@ def save_node_adj_to_json(file_name, adj):
     f.close()
 
 
-def save_adj_to_json(file_name, pred, to_keep, to_add):
+
+def save_adj_to_json(file_name, pred, new_pred, to_keep, to_add):
     #to_keep: 1, to_add: 2
     label_category = json.load(open('data/coco/labels_category.json','r'))
     label2id = dict((v["name"],v["id"]-1) for v in label_category) 
@@ -194,7 +192,10 @@ def save_adj_to_json(file_name, pred, to_keep, to_add):
                     tmp_list.append([adj_reorder[i,j],ops[i,j]])
             edge_list.append(tmp_list)     
     json_data = {}
-    json_data["predict"] = [{str(label2id[idx2label[k]]):str(v)} for k,v in pred.items()]
+    
+    json_data["original_predict"] = [{str(label2id[idx2label[k]]):str(v)} for k,v in pred.items()]
+    json_data["new_predict"] = [{str(label2id[idx2label[k]]):str(v)} for k,v in new_pred.items()]
+
     json_data["links"] = edge_list
     j = json.dumps(json_data)
     f = open(file_name, 'w')

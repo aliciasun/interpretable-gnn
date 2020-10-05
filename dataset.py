@@ -186,7 +186,7 @@ class CocoGender(data.Dataset):
             img = self.transform(img)
         target = np.zeros(self.num_classes, np.float32) #- 1
         target[labels] = 1
-        return (img, filename, gender, self.inp,labels), target
+        return (img, filename, gender, self.inp), target
 
     def get_constraints(self, margin, val = 0.0):
         margin2 = margin
@@ -254,12 +254,6 @@ class CocoGender(data.Dataset):
         f.close()
 
 
-
-
-
-
-
 val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
 val_dataset.generate_id_gender_pair()
-
 
