@@ -14,6 +14,9 @@ class GNNInterpreter(nn.Module):
     ):
         super(GNNInterpreter, self).__init__()
         self.model = model
+        use_cuda = torch.cuda.is_available()
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        self.model.to(device)
         self.model.eval()
         self.num_nodes = adj.shape[0]
         self.adj = adj.clone()
@@ -21,31 +24,42 @@ class GNNInterpreter(nn.Module):
         self.x = x
         self.labels = labels
         self.pred = pred
-        # self.pred_prob = torch.sigmoid(pred)
         self.mode = args.mode
-        print(args.mode)
         self.args = args
+        print(args.mode)
         self.num_nodes = self.adj.shape[0]
         self.creterion = nn.MultiLabelSoftMarginLoss()
         self.target_label = args.target_label 
    
         self.diagonal_mask = torch.ones_like(self.adj)-torch.eye(self.num_nodes)
         adj_supplement = torch.ones_like(self.adj)-torch.eye(self.num_nodes)-self.adj
-        # adj_supplement = torch.ones_like(self.adj)-self.adj
         #a candidate to add is 1, a candidate to remove is -1
         self.budget = adj_supplement-self.adj 
         torch.manual_seed(1)
         
-        if args.mode == 'promote' or args.mode == 'promote_v2':
-            self.mask, self.mask_bias = self._initialize_mask(init_strategy='const', const=0.0)
-            self.mask_to_add = self.mask*(self.budget>0)
-            self.mask_existing = self.mask*(self.budget<0)
+        if args.mode == 'promote':
+            mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.0)
+            self.mask_to_add = mask*(self.budget>0)
+            self.mask_existing = mask*(self.budget<0)
+            self.mask = mask
             self.l_existing = 0.0005
             self.l_new = 0.005
+            self.confidence = 0.05
+
+        elif args.mode == 'promote_v2':
+            mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
+            self.mask = mask
+            self.mask_to_add = mask*(self.budget>0)
+            self.mask_existing = torch.zeros_like(mask)
+            self.l_new = 0.001
+            self.confidence = 0.1
         elif args.mode == 'preserve' or args.mode == 'group':
-            self.mask, self.mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
+            mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
+            with torch.no_grad():
+                mask[self.budget>0]=0
+            self.mask = mask
             self.mask_existing = self.mask*(self.budget<0)
-            self.mask_to_add = torch.zeros_like(self.mask_existing)
+            self.mask_to_add = torch.zeros_like(self.mask)
             self.l_existing = 0.001
         elif args.mode == 'attack' or args.mode == 'target_attack':
             self.mask, self.mask_bias = self._initialize_mask(init_strategy='const', const=0.0)
@@ -53,13 +67,12 @@ class GNNInterpreter(nn.Module):
             self.mask_existing = self.mask*(self.budget<0)
             self.l_existing = 0.001
             self.l_new = 0.001
+            self.confidence = 0.1
         else:
             pass
+        self.mask.to(device)
         # self.optimizer = optim.SGD([self.mask], lr=0.001, momentum=0.95, weight_decay=1e-4)
         self.optimizer = optim.Adam([self.mask],lr=0.1)
-
-        self.confidence = 0.05
-      
         self.exp_lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer,
                                              step_size=20, gamma=0.1)
  
@@ -94,9 +107,12 @@ class GNNInterpreter(nn.Module):
 
     def get_masked_adj(self):
         mask = torch.sigmoid(self.mask)
-        if self.mode == 'preserve':
+        if self.mode == 'preserve' or self.mode == 'group':
             self.mask_existing = mask*(self.budget<0)
             masked_adj = self.adj + self.mask_existing*self.budget*self.diagonal_mask
+        elif self.mode == 'promote_v2':
+            self.mask_new = mask*(self.budget>0)
+            masked_adj = self.adj + self.mask_new*self.budget*self.diagonal_mask
         else:
             masked_adj = self.adj + mask*self.budget*self.diagonal_mask
             self.mask_existing = mask*(self.budget<0)
@@ -119,8 +135,7 @@ class GNNInterpreter(nn.Module):
             other = ((1.0-self.labels)*pred_prob).max(1)[0]
             real = pred_prob[self.labels==1]
             loss_factual = torch.clamp(real-other, max = self.confidence)
-            loss = scale_factor*torch.sum(loss_factual) + 0.001*torch.norm(self.mask_existing, p=1) -\
-            0.001*torch.norm(self.mask_to_add, p=1)
+            loss = scale_factor*torch.sum(loss_factual) - self.l_new*torch.norm(self.mask_to_add, p=1)
             loss = -1.0*loss
         elif self.mode == 'preserve':
             loss_pred = self.creterion(pred, orig_pred)

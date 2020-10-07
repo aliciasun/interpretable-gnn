@@ -343,7 +343,7 @@ def get_neighbor_with_k_hops(adj, k_hops, use_cuda=False):
         power_adj = power_adj @ adj
         prev_hop_adj = hop_adj
         hop_adj = hop_adj + power_adj
-        hop_adj = (hop_adj > 0).float()
+        # hop_adj = (hop_adj > 0).float()
     return hop_adj.cpu().numpy().astype(int)
 
 def calculate_gender(gender):

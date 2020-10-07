@@ -148,10 +148,13 @@ class CocoGender(data.Dataset):
         self.phase = phase
         self.data = pickle.load(open('data/coco_gender/{0}.data'.format(phase),'rb'))
         self.img_list = []
+        self.transform = None
         self.occurrence_threshold = 100
         download_coco2014('data/coco', phase)
         print(len(self.data))
+        self.generate_id_gender_pair()
         self.get_anno()
+        self.compute_male_female_per_object()
         self.num_classes = len(self.cat2idx)
         with open(inp_name, 'rb') as f:
             self.inp = pickle.load(f)
@@ -209,6 +212,13 @@ class CocoGender(data.Dataset):
         partial_cons = {verb:all_cons[verb] for verb in cons_verbs if verb in all_cons}
         return partial_cons
 
+    def compute_male_female_per_object(self):
+        anno = json.load(open('data/coco_gender/{}_anno.json'.format(self.phase)))
+        # for sample in self.data:
+        #     print(sample)
+        # f = open(output_path, 'w')
+        # f.write(json.dumps(anno_data_list))
+        # f.close()
     def compute_male_female_per_object_322(self, samples):
         """
         for each label, compute occurance of male and female in training set
@@ -239,8 +249,8 @@ class CocoGender(data.Dataset):
     def generate_id_gender_pair(self):
         #save id-gender-label-pair to json
         output_path = os.path.join('data/coco_gender', '{}_anno.json'.format(self.phase))
-        val_anno = json.load(open('data/coco/data/val_anno.json'))
-        img_list = {a['file_name']:a['labels'] for a in val_anno}
+        anno = json.load(open('data/coco/data/{}_anno.json'.format(self.phase)))
+        img_list = {a['file_name']:a['labels'] for a in anno}
         anno_data_list = []
         for sample in self.data:
             gender = sample['annotation'][0]
@@ -254,6 +264,13 @@ class CocoGender(data.Dataset):
         f.close()
 
 
-val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
-val_dataset.generate_id_gender_pair()
+# val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
+# val_dataset.generate_id_gender_pair()
+train_dataset = CocoGender(phase='train', inp_name='data/coco/coco_glove_word2vec.pkl')
+# train_dataset.generate_id_gender_pair()
+
+#training dataset
+# tennis 770 1122
+# knife 371 372
+
 
