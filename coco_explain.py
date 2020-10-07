@@ -102,15 +102,15 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             feature=Variable(inp[2], requires_grad=True).float()
         else:
             feature=Variable(inp[3], requires_grad=True).float()
-        label_idx = np.where(target==1)[1]
+        label_idx = np.where(target.cpu()==1)[1]
         true_labels = [idx2label[l] for l in label_idx]
         
         true_label_length = len(true_labels)
         print("ground truth label....",true_labels)
-
-        pred=model(photo, feature)
-        orig_pred_prob = torch.sigmoid(pred)
-        pred_list = torch.sigmoid(pred[0]).detach().numpy()
+        with torch.no_grad():
+            pred=model(photo, feature)
+            orig_pred_prob = torch.sigmoid(pred)
+        pred_list = torch.sigmoid(pred[0]).cpu().detach().numpy()
         preds = list(pred_list.argsort()[-true_label_length:][::-1])
         pred_prob={i:pred_list[i] for i in preds}
         predicted_labels = [idx2label[l] for l in preds]
@@ -161,6 +161,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 if step%10 == 0:
                     print('[iter:%d] to_remove mask weight: %.3f to_add mask weight: %.3f loss: %.3f' %
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
+            orig_A = orig_A.cpu()
             mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
             if args.save_mask:
@@ -179,7 +180,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 masked_adj_smooth = interpreter.masked_adj.detach()
             new_pred=model(photo, feature, adj = masked_adj_smooth)
             new_pred = torch.sigmoid(new_pred)
-            new_pred_list = new_pred[0].detach().numpy()
+            new_pred_list = new_pred[0].cpu().detach().numpy()
             new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
             del photo
             del feature
