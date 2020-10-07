@@ -108,7 +108,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
         true_label_length = len(true_labels)
         print("ground truth label....",true_labels)
         with torch.no_grad():
-            pred=model(photo, feature)
+            pred=model(photo.to(device), feature.to(device))
             orig_pred_prob = torch.sigmoid(pred)
         pred_list = torch.sigmoid(pred[0]).cpu().detach().numpy()
         preds = list(pred_list.argsort()[-true_label_length:][::-1])
