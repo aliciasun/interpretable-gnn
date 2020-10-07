@@ -16,6 +16,7 @@ class GNNInterpreter(nn.Module):
         self.model = model
         use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda:0" if use_cuda else "cpu")
+        print(self.device)
         self.model.to(self.device)
         self.model.eval()
         self.num_nodes = adj.shape[0]
@@ -52,8 +53,8 @@ class GNNInterpreter(nn.Module):
         elif args.mode == 'promote_v2':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
             self.mask = torch.nn.Parameter(mask.to(self.device))
-            self.mask_to_add = mask*(self.budget>0)
-            self.mask_existing = torch.zeros_like(mask)
+            self.mask_to_add = self.mask*(self.budget>0)
+            self.mask_existing = torch.zeros_like(self.mask)
             self.l_new = 0.0005
             self.confidence = 0.1
         elif args.mode == 'preserve' or args.mode == 'group':
@@ -73,7 +74,7 @@ class GNNInterpreter(nn.Module):
             self.confidence = 0.1
         else:
             pass
-        self.mask.to(device)
+        self.mask.to(self.device)
         # self.optimizer = optim.SGD([self.mask], lr=0.001, momentum=0.95, weight_decay=1e-4)
         self.optimizer = optim.Adam([self.mask],lr=0.1)
         self.exp_lr_scheduler = optim.lr_scheduler.StepLR(self.optimizer,

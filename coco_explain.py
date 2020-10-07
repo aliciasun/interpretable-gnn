@@ -95,13 +95,13 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
         print("training for image: {0}".format(i))
         if i > 50:
             break
-        photo=Variable(inp[0], requires_grad=True).float()
+        photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
            
         if args.dataset == 'coco':
-            feature=Variable(inp[2], requires_grad=True).float()
+            feature=Variable(inp[2], requires_grad=True).float().to(device)
         else:
-            feature=Variable(inp[3], requires_grad=True).float()
+            feature=Variable(inp[3], requires_grad=True).float().to(device)
         label_idx = np.where(target.cpu()==1)[1]
         true_labels = [idx2label[l] for l in label_idx]
         
@@ -161,7 +161,6 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 if step%10 == 0:
                     print('[iter:%d] to_remove mask weight: %.3f to_add mask weight: %.3f loss: %.3f' %
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
-            orig_A = orig_A.cpu()
             mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
             if args.save_mask:
@@ -175,7 +174,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 mask_to_add[mask_to_add<1] = 0
                 mask_to_keep = orig_A
             if args.mode == 'preserve' or args.mode == 'promote_v2':
-                masked_adj_smooth = smooth_adj(interpreter.masked_adj.detach())
+                masked_adj_smooth = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
+
             else:
                 masked_adj_smooth = interpreter.masked_adj.detach()
             new_pred=model(photo, feature, adj = masked_adj_smooth)
