@@ -15,11 +15,11 @@ class GNNInterpreter(nn.Module):
         super(GNNInterpreter, self).__init__()
         self.model = model
         use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda:0" if use_cuda else "cpu")
-        self.model.to(device)
+        self.device = torch.device("cuda:0" if use_cuda else "cpu")
+        self.model.to(self.device)
         self.model.eval()
         self.num_nodes = adj.shape[0]
-        self.adj = adj.clone()
+        self.adj = adj.clone().to(self.device)
         self.feature = feature
         self.x = x
         self.labels = labels
@@ -31,11 +31,14 @@ class GNNInterpreter(nn.Module):
         self.creterion = nn.MultiLabelSoftMarginLoss()
         self.target_label = args.target_label 
    
-        self.diagonal_mask = torch.ones_like(self.adj)-torch.eye(self.num_nodes)
-        adj_supplement = torch.ones_like(self.adj)-torch.eye(self.num_nodes)-self.adj
+        self.diagonal_mask = torch.ones_like(self.adj).to(self.device)-(torch.eye(self.num_nodes)).to(self.device)
+        self.diagonal_mask = self.diagonal_mask.to(self.device)
+        adj_supplement = torch.ones_like(self.adj).to(self.device)-torch.eye(self.num_nodes).to(self.device)-self.adj
         #a candidate to add is 1, a candidate to remove is -1
-        self.budget = adj_supplement-self.adj 
+        self.budget = adj_supplement.to(self.device)-self.adj 
+        self.budget = self.budget.to(self.device)
         torch.manual_seed(1)
+
         
         if args.mode == 'promote':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.0)
@@ -48,7 +51,7 @@ class GNNInterpreter(nn.Module):
 
         elif args.mode == 'promote_v2':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
-            self.mask = mask
+            self.mask = torch.nn.Parameter(mask.to(self.device))
             self.mask_to_add = mask*(self.budget>0)
             self.mask_existing = torch.zeros_like(mask)
             self.l_new = 0.0005
@@ -100,7 +103,7 @@ class GNNInterpreter(nn.Module):
         
 
     def forward(self, feature, x):
-        self.masked_adj = self.get_masked_adj()
+        self.masked_adj = self.get_masked_adj().to(self.device)
         cur_pred = self.model(feature, x, adj = self.masked_adj, mode='explain')
         cur_pred_prob = torch.sigmoid(cur_pred)
         return cur_pred, cur_pred_prob
@@ -118,12 +121,13 @@ class GNNInterpreter(nn.Module):
             self.mask_existing = mask*(self.budget<0)
             self.mask_to_add = mask*(self.budget>0)
         # masked_adj = masked_adj * 0.25 / (torch.sum(masked_adj) + 1e-6)
+        masked_adj = masked_adj.to(self.device)
         masked_adj_smooth = masked_adj + torch.eye(self.num_nodes)
         return masked_adj_smooth
 
     def loss(self, pred, orig_pred):
         scale_factor = 1.0/self.x.shape[0]
-        pred_prob = torch.sigmoid(pred)
+        pred_prob = torch.sigmoid(pred).to(self.device)
         if self.mode == 'promote':
             other = ((1.0-self.labels)*pred_prob).max(1)[0]
             real = pred_prob[self.labels==1]
