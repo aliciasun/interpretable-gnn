@@ -51,7 +51,7 @@ class GNNInterpreter(nn.Module):
             self.mask = mask
             self.mask_to_add = mask*(self.budget>0)
             self.mask_existing = torch.zeros_like(mask)
-            self.l_new = 0.001
+            self.l_new = 0.0005
             self.confidence = 0.1
         elif args.mode == 'preserve' or args.mode == 'group':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
@@ -128,7 +128,7 @@ class GNNInterpreter(nn.Module):
             other = ((1.0-self.labels)*pred_prob).max(1)[0]
             real = pred_prob[self.labels==1]
             loss_factual = torch.clamp(real-other, max = self.confidence)
-            loss = scale_factor*torch.sum(loss_factual) + self.l_existing*torch.norm(self.mask_existing, p=1) -\
+            loss = scale_factor*torch.sum(loss_factual) - self.l_existing*torch.norm(self.mask_existing, p=1) -\
             self.l_new*torch.norm(self.mask_to_add, p=1)
             loss = -1.0*loss
         elif self.mode == 'promote_v2':

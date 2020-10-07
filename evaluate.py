@@ -10,11 +10,13 @@ label_dic ={"airplane": 0,
 
 idx2label = dict((v,k) for k,v in label_dic.items())
 
-def evaluate(labels, preds, adj, mask, n=10, k=2):
+def evaluate(labels, preds, adj, mask, args, n=10, k=2):
     """
     num_relevent: number of k-th neighbors for relevent labels
     num_hit: in the top n edges in mask, number of edges that contain true labels
     """
+    if args.mode == 'promote_v2':
+        adj = mask
     if k==1:
         kth_mask = mask
         kth_adj = adj
@@ -26,7 +28,7 @@ def evaluate(labels, preds, adj, mask, n=10, k=2):
         binary_mask[binary_mask<0.4]=0
         kth_mask = get_neighbor_with_k_hops(binary_mask, k)
         # kth_binary_mask = get_neighbor_with_k_hops(binary_mask, k)
-
+    
     kth_mask = kth_mask*(1-np.eye(mask.shape[0]))
     kth_adj = kth_adj*(1-np.eye(adj.shape[0]))
     max_index=largest_indices(kth_mask,n)
@@ -34,21 +36,25 @@ def evaluate(labels, preds, adj, mask, n=10, k=2):
     preds_set = set(preds)
 
     num_hit_pred, num_hit_real = 0,0
-    num_rel_pred, num_rel_real = 0, 0
+    num_rel_pred, num_rel_real = 0,0
+    num_path_real = 0
+
     for i in labels:
         for j in labels:
             if kth_adj[i,j] >= 1:
                 num_rel_real +=1
+                num_path_real += kth_adj[i,j]
     for i in preds:
         for j in preds:
             if kth_adj[i,j] >= 1:
                 num_rel_pred +=1
-    for idx in zip(max_index[0],max_index[1]):
-        if idx[0] in labels_set and idx[1] in labels_set:
-            num_hit_real +=1
-        if idx[0] in preds_set and idx[1] in preds_set:
-            num_hit_pred +=1
-    return num_rel_real, num_rel_pred, num_hit_real, num_hit_pred
+    if args.mode != 'promote_v2':
+        for idx in zip(max_index[0],max_index[1]):
+            if idx[0] in labels_set and idx[1] in labels_set:
+                num_hit_real +=1
+            if idx[0] in preds_set and idx[1] in preds_set:
+                num_hit_pred +=1
+    return num_rel_real, num_rel_pred, num_hit_real, num_hit_pred, num_path_real
 
 def evaluate_faithfulness(scores_, targets_):
     pass

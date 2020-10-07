@@ -93,7 +93,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     model.to(device)
     for i, (inp, target) in enumerate(val_loader):
         print("training for image: {0}".format(i))
-        if i > 10:
+        if i > 50:
             break
         photo=Variable(inp[0], requires_grad=True).float()
         img_path = inp[1][0].split(".")[0]
@@ -163,6 +163,9 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
             mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
+            if args.save_mask:
+                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
+                    np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
             if args.mode == 'preserve':
                 mask_to_add = np.zeros(orig_A.shape[0])
             if args.mode == 'promote_v2':
@@ -194,21 +197,18 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
                 print('-------------------------------------------')
                 print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
-            if args.save_mask:
-                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
-                    np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
-                file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
-                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
+           
+                # file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
+                # utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
 
         print("common pred: {0}".format(statistics.mean(common_pred)))
         print("common real: {0}".format(statistics.mean(common_real)))
 
         for k in [1,2]:
             print("evaluating on {0}-hop neighbors".format(k))
+            num_rel_real, num_rel_pred, num_hit_real, num_hit_pred,num_path = evaluate(label_idx, preds, orig_A, mask_to_keep, args,k=k)
             if args.mode == 'promote_v2':
-                num_rel_real, num_rel_pred, num_hit_real, num_hit_pred = evaluate(label_idx, preds, orig_A, mask_to_add+mask_to_keep, k=k)
-            else:
-                num_rel_real, num_rel_pred, num_hit_real, num_hit_pred = evaluate(label_idx, preds, orig_A, mask_to_keep, k=k)
+                num_rel_real_add, num_rel_pred_add, _, _,num_path_add = evaluate(label_idx, preds, orig_A, mask_to_add+mask_to_keep,args, k=k)
             if num_rel_pred != 0 :
                 hit_pred.append(num_hit_pred)
                 perf_pred.append(num_hit_pred/num_rel_pred)
@@ -222,15 +222,20 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             print("number of hit real edges: {0}".format(num_hit_real))
             print("average performance pred: {0}".format(statistics.mean(perf_pred)))
             print("average performance real: {0}".format(statistics.mean(perf_real)))
+            if args.mode == 'promote_v2':
+                print("number of relevent real edges after add: {0}".format(num_rel_real_add))
+                print("number of paths between real labels: {0}".format(num_path))
+                print("number of paths between real labels after add: {0}".format(num_path_add))
            
-            if args.mode != 'preserve':
-                _, num_rel_add, num_hit_real_add, num_hit_pred_add = evaluate(label_idx, preds, orig_A, mask_to_keep+mask_to_add, k=k)
-                if num_rel_pred != 0 :
-                    perf_pred_add.append(num_hit_pred_add/num_rel_pred)
-                if num_rel_real != 0:
-                    perf_real_add.append(num_hit_real_add/num_rel_real)
-                print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
-                print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
+            # if args.mode != 'preserve':
+            #     _, num_rel_add, num_hit_real_add, num_hit_pred_add,_ = evaluate(label_idx, preds, orig_A, mask_to_keep+mask_to_add, args, k=k)
+            #     if num_rel_pred != 0 :
+            #         perf_pred_add.append(num_hit_pred_add/num_rel_pred)
+            #     if num_rel_real != 0:
+            #         perf_real_add.append(num_hit_real_add/num_rel_real)
+            #     print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
+            #     print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
+            
 
 
 if __name__ == "__main__":
