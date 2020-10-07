@@ -307,7 +307,6 @@ if __name__ == "__main__":
     else:
         # train_dataset = CocoGender(phase='train', inp_name='data/coco/coco_glove_word2vec.pkl')
         val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
-        # count = val_dataset.compute_male_female_per_object_322(val_dataset)
     normalize = transforms.Normalize(mean=model.image_normalization_mean,
                                                 std=model.image_normalization_std)
     val_dataset.transform = transforms.Compose([
@@ -325,13 +324,11 @@ if __name__ == "__main__":
     # file_name = 'subgraph_coco_gender/ground_truth.json'
     # utils_viz.save_node_adj_to_json(file_name, adj)
     if args.mode == 'group':
-
-    
         target_labels =  ['tennis racket','knife','motorcycle']
         from collections import defaultdict
         label_dic_male = defaultdict(list)
         label_dic_female = defaultdict(list)
-        for i, (inp, target) in enumerate(test_loader):
+        for i, (inp, target) in enumerate(val_loader):
             gender = Variable(inp[2], requires_grad=False).detach().numpy()[0]
             label_idx = np.where(target==1)[1]
             true_labels = [idx2label[l] for l in label_idx]

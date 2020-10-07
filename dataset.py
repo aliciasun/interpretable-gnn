@@ -6,7 +6,7 @@ import numpy as np
 import subprocess
 from PIL import Image
 from urllib.request import urlretrieve
-
+import itertools
 import torch.utils.data as data
 
 import utils
@@ -240,11 +240,38 @@ class CocoGender(data.Dataset):
                         count[j][1] += 1
         return count
 
-    def generate_adj_file(self, samples):
+    def generate_adj_file(self):
         #p(L_i|L_j)
-        M = np.zeros((self.num_classes+2, self.num_classes+2))
-        for sample in samples:
-            pass
+        M = np.zeros((self.num_classes, self.num_classes))
+        N = np.zeros((1, self.num_classes))
+        N_male= np.zeros((1, self.num_classes))
+        N_female= np.zeros((1, self.num_classes))
+        M_male = np.zeros((self.num_classes, self.num_classes))
+        M_female = np.zeros((self.num_classes, self.num_classes))
+        anno_path = os.path.join('data/coco_gender', '{}_anno.json'.format(self.phase))
+        anno = json.load(open(anno_path))
+        for a in anno:
+            labels = a['labels']
+            gender = a['gender']
+            N[:,labels]+=1
+            if gender==0:
+                N_female[:,labels]+=1
+            else:
+                N_male[:,labels]+=1
+            for i in labels:
+                for j in labels:
+                    M[i,j]+=1
+                if gender==0:
+                    M_female[i,j]+=1
+                else:
+                    M_male[i,j]+=1
+        print(N)
+        print(N_female)
+        print(N_male)
+        print(N_female-N_male)
+        return M/N[None,:],M_male/N_male[None,:],M_female/N_female[None,:]
+
+            
 
     def generate_id_gender_pair(self):
         #save id-gender-label-pair to json
@@ -264,9 +291,12 @@ class CocoGender(data.Dataset):
         f.close()
 
 
-# val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
-# val_dataset.generate_id_gender_pair()
-train_dataset = CocoGender(phase='train', inp_name='data/coco/coco_glove_word2vec.pkl')
+val_dataset = CocoGender(phase='val', inp_name='data/coco/coco_glove_word2vec.pkl')
+# full,male,female = val_dataset.generate_adj_file()
+# print(full)
+# print(male)
+# print(female)
+# train_dataset = CocoGender(phase='train', inp_name='data/coco/coco_glove_word2vec.pkl')
 # train_dataset.generate_id_gender_pair()
 
 #training dataset
