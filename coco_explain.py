@@ -266,7 +266,7 @@ if __name__ == "__main__":
         help="print"
     )
     parser.add_argument(
-        "--save_mask", 
+        "--save-mask", 
         dest="save_mask", 
         action="store_const", 
         const=True,
