@@ -163,22 +163,22 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
             mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
-            if args.save_mask:
-                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
-                    np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
+            
                 
             if args.mode == 'preserve':
                 mask_to_add = np.zeros(orig_A.shape[0])
                 max_index=utils.largest_indices(mask_to_keep,10)
-                mask_to_keep[max_index] = 1
-                mask_to_keep[mask_to_keep<1] = 0
-                masked_adj = mask_to_keep
+                threshold_mask = mask_to_keep.clone()
+                threshold_mask[max_index] = 1
+                threshold_mask[threshold_mask<1] = 0
+                masked_adj = threshold_mask
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
                 max_index=utils.largest_indices(mask_to_add,2)
-                mask_to_add[max_index] = 1
-                mask_to_add[mask_to_add<1] = 0
-                masked_adj = orig_A+mask_to_add
+                threshold_mask = mask_to_add.clone()
+                threshold_mask[max_index] = 1
+                threshold_mask[threshold_mask<1] = 0
+                masked_adj = orig_A+threshold_mask
             if args.mode == 'attack':
                 #keep 2 modified edges, 1 add, 1 attack
                 max_index_to_keep=utils.largest_indices(mask_to_keep,1)
@@ -196,9 +196,12 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             new_pred_list = new_pred[0].cpu().detach().numpy()
             new_preds = np.where(new_pred_list>0.5)[0]
             # new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
-            del photo
-            del feature
-            torch.cuda.empty_cache()
+            
+            if args.save_mask:
+                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
+                    np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
+                file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
+                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
             new_pred_prob={i:new_pred_list[i] for i in new_preds}
             new_predicted_labels = [idx2label[l] for l in new_preds]
             print("predict label.....",new_predicted_labels)
@@ -212,9 +215,10 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
                 print('-------------------------------------------')
                 print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
-                file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
-                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
-           
+                
+            del photo
+            del feature
+            torch.cuda.empty_cache()
                 
 
         print("common pred: {0}".format(statistics.mean(common_pred)))
