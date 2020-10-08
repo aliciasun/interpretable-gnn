@@ -70,10 +70,10 @@ def evaluate(labels, preds, adj, mask, args, n=10, k=2):
 def evaluate_faithfulness(scores_, targets_):
     pass
 
-def evaluate_add_edges(adj, num_add = 3):
+def evaluate_add_edges(adj, num_add = 5):
     # files = [f for f in listdir(mask_path) if isfile(join(mask_path, f))]
     # num_images = len(files)
-    
+    N = 1000    
     # for i in range(len(files)):
     anno_path = os.path.join('data/coco_gender', '{}_anno.json'.format('val'))
     anno = json.load(open(anno_path))
@@ -95,9 +95,9 @@ def evaluate_add_edges(adj, num_add = 3):
             mask[mask<1] = 0
             new_adj = adj+mask
             n, p = count_relevant_edges(labels, new_adj, k=2)
-            num_paths = np.zeros([1,100])
-            num_edges = np.zeros([1,100])
-            for t in range(1,100):
+            num_paths = np.zeros([1,N])
+            num_edges = np.zeros([1,N])
+            for t in range(N):
                 alt_adj = adj.copy()
                 valid_edge = 0
                 while valid_edge<(k+1):
