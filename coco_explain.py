@@ -166,22 +166,36 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             if args.save_mask:
                 with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
                     np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
+                
             if args.mode == 'preserve':
                 mask_to_add = np.zeros(orig_A.shape[0])
+                max_index=utils.largest_indices(mask_to_keep,10)
+                mask_to_keep[max_index] = 1
+                mask_to_keep[mask_to_keep<1] = 0
+                masked_adj = mask_to_keep
+                # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
-                max_index=utils.largest_indices(mask_to_add,3)
+                max_index=utils.largest_indices(mask_to_add,2)
                 mask_to_add[max_index] = 1
                 mask_to_add[mask_to_add<1] = 0
-                mask_to_keep = orig_A
-            if args.mode == 'preserve' or args.mode == 'promote_v2':
-                masked_adj_smooth = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
-
-            else:
-                masked_adj_smooth = interpreter.masked_adj.detach()
+                masked_adj = orig_A+mask_to_add
+            if args.mode == 'attack':
+                #keep 2 modified edges, 1 add, 1 attack
+                max_index_to_keep=utils.largest_indices(mask_to_keep,1)
+                max_index_to_add=utils.largest_indices(mask_to_add,1)
+                mask_to_keep[max_index_to_keep] = 1
+                mask_to_add[mask_to_add<1] = 0
+                masked_adj = orig_A+mask_to_add
+            # if args.mode == 'preserve' or args.mode == 'promote_v2':
+            #     # masked_adj_smooth = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
+            # else:
+            #     masked_adj_smooth = interpreter.masked_adj.detach()
+            masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
             new_pred=model(photo, feature, adj = masked_adj_smooth)
             new_pred = torch.sigmoid(new_pred)
             new_pred_list = new_pred[0].cpu().detach().numpy()
-            new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
+            new_preds = np.where(new_pred_list>0.5)[0]
+            # new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
             del photo
             del feature
             torch.cuda.empty_cache()
@@ -198,44 +212,45 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
                 print('-------------------------------------------')
                 print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
+                file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
+                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
            
-                # file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
-                # utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
+                
 
         print("common pred: {0}".format(statistics.mean(common_pred)))
         print("common real: {0}".format(statistics.mean(common_real)))
+        if args.evaluate:
+            for k in [1,2]:
+                print("evaluating on {0}-hop neighbors".format(k))
+                num_rel_real, num_rel_pred, num_hit_real, num_hit_pred = evaluate(label_idx, preds, orig_A, mask_to_keep, args,k=k)
+                # if args.mode == 'promote_v2':
+                #     num_rel_real_add, num_rel_pred_add, _, _ = evaluate(label_idx, preds, orig_A, mask_to_add+mask_to_keep,args, k=k)
+                if num_rel_pred != 0 :
+                    hit_pred.append(num_hit_pred)
+                    perf_pred.append(num_hit_pred/num_rel_pred)
+                if num_rel_real != 0:
+                    hit_real.append(num_hit_real)
+                    perf_real.append(num_hit_real/num_rel_real)
 
-        for k in [1,2]:
-            print("evaluating on {0}-hop neighbors".format(k))
-            num_rel_real, num_rel_pred, num_hit_real, num_hit_pred,num_path = evaluate(label_idx, preds, orig_A, mask_to_keep, args,k=k)
-            if args.mode == 'promote_v2':
-                num_rel_real_add, num_rel_pred_add, _, _,num_path_add = evaluate(label_idx, preds, orig_A, mask_to_add+mask_to_keep,args, k=k)
-            if num_rel_pred != 0 :
-                hit_pred.append(num_hit_pred)
-                perf_pred.append(num_hit_pred/num_rel_pred)
-            if num_rel_real != 0:
-                hit_real.append(num_hit_real)
-                perf_real.append(num_hit_real/num_rel_real)
-
-            print("number of relevent predict edges: {0}".format(num_rel_pred))
-            print("number of relevent real edges: {0}".format(num_rel_real))
-            print("number of hit predict edges: {0}".format(num_hit_pred))
-            print("number of hit real edges: {0}".format(num_hit_real))
-            print("average performance pred: {0}".format(statistics.mean(perf_pred)))
-            print("average performance real: {0}".format(statistics.mean(perf_real)))
-            if args.mode == 'promote_v2':
-                print("number of relevent real edges after add: {0}".format(num_rel_real_add))
-                print("number of paths between real labels: {0}".format(num_path))
-                print("number of paths between real labels after add: {0}".format(num_path_add))
-           
-            # if args.mode != 'preserve':
-            #     _, num_rel_add, num_hit_real_add, num_hit_pred_add,_ = evaluate(label_idx, preds, orig_A, mask_to_keep+mask_to_add, args, k=k)
-            #     if num_rel_pred != 0 :
-            #         perf_pred_add.append(num_hit_pred_add/num_rel_pred)
-            #     if num_rel_real != 0:
-            #         perf_real_add.append(num_hit_real_add/num_rel_real)
-            #     print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
-            #     print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
+                print("number of relevent predict edges: {0}".format(num_rel_pred))
+                print("number of relevent real edges: {0}".format(num_rel_real))
+                print("number of hit predict edges: {0}".format(num_hit_pred))
+                print("number of hit real edges: {0}".format(num_hit_real))
+                print("average performance pred: {0}".format(statistics.mean(perf_pred)))
+                print("average performance real: {0}".format(statistics.mean(perf_real)))
+                # if args.mode == 'promote_v2':
+                #     print("number of relevent real edges after add: {0}".format(num_rel_real_add))
+                #     print("number of paths between real labels: {0}".format(num_path))
+                #     print("number of paths between real labels after add: {0}".format(num_path_add))
+            
+                # if args.mode != 'preserve':
+                #     _, num_rel_add, num_hit_real_add, num_hit_pred_add,_ = evaluate(label_idx, preds, orig_A, mask_to_keep+mask_to_add, args, k=k)
+                #     if num_rel_pred != 0 :
+                #         perf_pred_add.append(num_hit_pred_add/num_rel_pred)
+                #     if num_rel_real != 0:
+                #         perf_real_add.append(num_hit_real_add/num_rel_real)
+                #     print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
+                #     print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
             
 
 
@@ -272,6 +287,14 @@ if __name__ == "__main__":
         const=True,
         default=False, 
         help="whether to save mask"
+    )
+    parser.add_argument(
+        "--evaluate",
+        dest="evaluate",
+        action="store_const",
+        const=True,
+        default=False,
+        help="Whether to add bias. Default to True.",
     )
     parser.add_argument(
         "--mask-bias",

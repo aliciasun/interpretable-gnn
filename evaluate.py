@@ -71,10 +71,6 @@ def evaluate_faithfulness(scores_, targets_):
     pass
 
 def evaluate_add_edges(adj, num_add = 3):
-    # files = [f for f in listdir(mask_path) if isfile(join(mask_path, f))]
-    # num_images = len(files)
-    
-    # for i in range(len(files)):
     anno_path = os.path.join('data/coco_gender', '{}_anno.json'.format('val'))
     anno = json.load(open(anno_path))
     num_images = len(anno)
