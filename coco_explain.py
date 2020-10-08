@@ -92,9 +92,9 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     model.to(device)
     for i, (inp, target) in enumerate(val_loader):
+        if i<4500:
+           continue
         print("training for image: {0}".format(i))
-        if i > 50:
-            break
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
            
