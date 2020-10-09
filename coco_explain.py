@@ -191,6 +191,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 pred = get_pred_json_list(photo, feature, masked_adj, args)
                 new_pred_prob = pred
                 pred_list.append(pred)
+                new_pred_prob = pred_list
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
                 pred_list = []
