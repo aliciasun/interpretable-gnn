@@ -190,7 +190,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 max_index=utils.largest_indices(to_keep,10)
                 masked_adj[max_index]=1
                 pred = get_pred_json_list(photo, feature, masked_adj, args)
-                new_pred_prob = pred
+                masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
             if args.mode == 'promote_v2':
