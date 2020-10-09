@@ -117,7 +117,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             pred=model(photo.to(device), feature.to(device))
             orig_pred_prob = torch.sigmoid(pred)
         pred_list = torch.sigmoid(pred[0]).cpu().detach().numpy()
-        preds = list(pred_list.argsort()[-true_label_length:][::-1])
+        preds = np.where(pred_list>0.5)[0]
+        # preds = list(pred_list.argsort()[-true_label_length:][::-1])
         pred_prob={i:pred_list[i] for i in preds}
         predicted_labels = [idx2label[l] for l in preds]
 
@@ -186,7 +187,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # threshold_mask[max_index] = 1
                 # threshold_mask[threshold_mask<1] = 0
                 # masked_adj = threshold_mask
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args)
                 new_pred_prob = pred
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
@@ -195,18 +196,18 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 masked_adj = orig_A.copy()
                 print(max_index[0][0])
                 masked_adj[max_index[0][0],max_index[1][0]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index[0][1],max_index[1][1]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index[0][0],max_index[1][0]] = 1
                 masked_adj[max_index[0][1],max_index[1][1]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
 
@@ -219,18 +220,18 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
                 masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
             new_preds = pred.keys()
@@ -296,14 +297,20 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 #     print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
                 #     print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
             
-def get_pred_json_list(photo, feature, masked_adj):
+def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
     new_pred=model(photo, feature, adj = masked_adj_smooth)
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
-    new_preds = np.where(new_pred_list>0.5)[0]
+    top_index = 0
+    if args.mode == 'attack':
+        top_index = np.argmax(new_pred_list)
+        new_preds = new_pred_list[orig_pred]
+        new_preds.append(top_index)
+    else:
+        new_preds = np.where(new_pred_list>0.5)[0]
     prob = [new_pred_list[i] for i in new_preds]
     new_pred_prob={i:new_pred_list[i] for i in new_preds}
     new_predicted_labels = [idx2label[l] for l in new_preds]
