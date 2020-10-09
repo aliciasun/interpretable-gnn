@@ -195,7 +195,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 new_pred_prob = pred_list
             if args.mode == 'promote_v2':
                 pred_list = []
-                for i in range(1,10):
+                for i in range(1,11):
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
@@ -228,10 +228,10 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 pred_list = []
                 #keep 2 modified edges, 1 add, 1 attack, first remove, then add
                 mask_existing = mask_existing.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
-                max_index_to_remove=utils.largest_indices(mask_existing,5)
-                max_index_to_add=utils.largest_indices(to_add,5)
+                max_index_to_remove=utils.largest_indices(mask_existing,10)
+                max_index_to_add=utils.largest_indices(to_add,10)
                 masked_adj = orig_A.copy()
-                for i in range(1,6):
+                for i in range(1,11):
                     max_index_to_remove=utils.largest_indices(mask_existing,i)
                     max_index_to_add=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
