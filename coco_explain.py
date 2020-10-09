@@ -92,8 +92,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     model.to(device)
     for i, (inp, target) in enumerate(val_loader):
-        if i<4500:
-           continue
+        if i>50:
+           break
         print("training for image: {0}".format(i))
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
@@ -175,7 +175,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
                 max_index=utils.largest_indices(mask_to_add,2)
-                threshold_mask = mask_to_add.clone()
+                threshold_mask = mask_to_add.copy()
                 threshold_mask[max_index] = 1
                 threshold_mask[threshold_mask<1] = 0
                 masked_adj = orig_A+threshold_mask
