@@ -98,12 +98,12 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     for i, (inp, target) in enumerate(val_loader):
         # if i>50:
         #    break
-        print("training for image: {0}".format(i))
+        
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
         if img_path not in img_names:
             continue
-           
+        print("training for image: {0}".format(i))
         if args.dataset == 'coco':
             feature=Variable(inp[2], requires_grad=True).float().to(device)
         else:
@@ -180,6 +180,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             
             #compute prediction under mask
             if args.mode == 'preserve':
+                pred_list = []
                 masked_adj = np.zeros([80,80])
                 max_index=utils.largest_indices(to_keep,10)
                 masked_adj[max_index]=1
@@ -189,12 +190,12 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # masked_adj = threshold_mask
                 pred = get_pred_json_list(photo, feature, masked_adj, args)
                 new_pred_prob = pred
+                pred_list.append(pred)
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
                 pred_list = []
                 max_index=utils.largest_indices(to_add,2)
                 masked_adj = orig_A.copy()
-                print(max_index[0][0])
                 masked_adj[max_index[0][0],max_index[1][0]] = 1
                 pred = get_pred_json_list(photo, feature, masked_adj, args)
                 pred_list.append(pred)
@@ -377,7 +378,7 @@ if __name__ == "__main__":
         help="Whether to add bias. Default to True.",
     )
     parser.set_defaults(
-        dataset='coco',
+        dataset='gender',
         method='mask',
         mode='preserve',
         num_steps=10,
