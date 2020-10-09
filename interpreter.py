@@ -48,7 +48,7 @@ class GNNInterpreter(nn.Module):
             self.mask = mask
             self.l_existing = 0.0005
             self.l_new = 0.005
-            self.confidence = 0.05
+            self.confidence = 0.5
 
         elif args.mode == 'promote_v2':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
@@ -66,7 +66,8 @@ class GNNInterpreter(nn.Module):
             self.mask_to_add = torch.zeros_like(self.mask)
             self.l_existing = 0.001
         elif args.mode == 'attack' or args.mode == 'target_attack':
-            self.mask, self.mask_bias = self._initialize_mask(init_strategy='const', const=0.0)
+            mask, self.bias = self._initialize_mask(init_strategy='const', const=0.0)
+            self.mask = torch.nn.Parameter(mask.to(self.device))
             self.mask_to_add = self.mask*(self.budget>0)
             self.mask_existing = self.mask*(self.budget<0)
             self.l_existing = 0.001
@@ -151,11 +152,12 @@ class GNNInterpreter(nn.Module):
             loss_pred = self.creterion(pred, orig_pred)
             loss = loss_pred - self.l_existing*torch.norm(self.mask_existing, p=1)
         elif self.mode == 'attack':
-            real = pred_prob[pred_prob_binary==1].min()
+            real = pred_prob[pred_prob_binary==1].max()
             other = ((1.0-pred_prob_binary)*pred_prob).max(1)[0]
-            loss_counter = torch.clamp(real-other, min = -1.0*self.confidence)
-            loss = scale_factor*torch.sum(loss_counter)+self.l_existing*torch.norm(self.mask_existing, p=1) +\
+            loss_counter = torch.clamp(other-real, max = self.confidence)
+            loss = scale_factor*torch.sum(loss_counter)-self.l_existing*torch.norm(self.mask_existing, p=1) -\
             self.l_new*torch.norm(self.mask_to_add, p=1)
+            loss = -1.0*loss
         elif self.mode == 'target_attack':
             real = pred_prob[0][self.target_label]
             other = ((1.0-self.labels)*pred_prob).max(1)[0]

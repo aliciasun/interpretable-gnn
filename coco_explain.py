@@ -215,25 +215,27 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
 
             if args.mode == 'attack':
                 pred_list = []
-                masked_adj = orig_A.copy()
                 #keep 2 modified edges, 1 add, 1 attack, first remove, then add
-                max_index_to_remove=utils.largest_indices(mask_existing.cpu().numpy(),1)
+                mask_existing = mask_existing.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
+                max_index_to_remove=utils.largest_indices(mask_existing,1)
                 max_index_to_add=utils.largest_indices(to_add,1)
+                print(max_index_to_remove)
+                print(max_index_to_add)
 
                 masked_adj = orig_A.copy()
-                masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
-                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
+                masked_adj[max_index_to_remove[0][0],max_index_to_remove[1][0]] = 0
+                pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
                 masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
                 pred_list.append(pred)
 
                 masked_adj = orig_A.copy()
-                masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
+                masked_adj[max_index_to_remove[0][0],max_index_to_remove[1][0]] = 0
                 masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
-                pred = get_pred_json_list(photo, feature, masked_adj, args, orig_pred)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
             new_preds = pred.keys()
@@ -309,8 +311,9 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     top_index = 0
     if args.mode == 'attack':
         top_index = np.argmax(new_pred_list)
-        new_preds = new_pred_list[orig_pred]
+        new_preds = list(orig_pred)
         new_preds.append(top_index)
+        print(new_preds)
     else:
         new_preds = np.where(new_pred_list>0.5)[0]
     prob = [new_pred_list[i] for i in new_preds]
