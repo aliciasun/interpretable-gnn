@@ -121,8 +121,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
         # preds = list(pred_list.argsort()[-true_label_length:][::-1])
         pred_prob={i:pred_list[i] for i in preds}
         predicted_labels = [idx2label[l] for l in preds]
-
         print("predict label.....",predicted_labels)
+        print("predict prob....", [pred_list[i] for i in preds])
         # if args.mode =='target_attack' and args.target_label in label_idx:
         #     continue
         if method == 'grad':
@@ -171,7 +171,11 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
             if args.print:
-                print(*utils.get_top_k_pairs(to_keep, idx2label, k=10), sep = "\n")
+                if args.mode == 'attack':
+                    to_remove = mask_existing.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
+                    print(*utils.get_top_k_pairs(to_remove, idx2label, k=10), sep = "\n")
+                else:
+                    print(*utils.get_top_k_pairs(to_keep, idx2label, k=10), sep = "\n")
                 print('-------------------------------------------')
                 print(*utils.get_top_k_pairs(to_add, idx2label, k=10), sep = "\n")
             if args.save_mask:
@@ -219,9 +223,6 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 mask_existing = mask_existing.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
                 max_index_to_remove=utils.largest_indices(mask_existing,1)
                 max_index_to_add=utils.largest_indices(to_add,1)
-                print(max_index_to_remove)
-                print(max_index_to_add)
-
                 masked_adj = orig_A.copy()
                 masked_adj[max_index_to_remove[0][0],max_index_to_remove[1][0]] = 0
                 pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
@@ -313,7 +314,6 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
         top_index = np.argmax(new_pred_list)
         new_preds = list(orig_pred)
         new_preds.append(top_index)
-        print(new_preds)
     else:
         new_preds = np.where(new_pred_list>0.5)[0]
     prob = [new_pred_list[i] for i in new_preds]

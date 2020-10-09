@@ -70,8 +70,8 @@ class GNNInterpreter(nn.Module):
             self.mask = torch.nn.Parameter(mask.to(self.device))
             self.mask_to_add = self.mask*(self.budget>0)
             self.mask_existing = self.mask*(self.budget<0)
-            self.l_existing = 0.001
-            self.l_new = 0.001
+            self.l_existing = 0.005
+            self.l_new = 0.005
             self.confidence = 0.1
         else:
             pass
@@ -130,11 +130,14 @@ class GNNInterpreter(nn.Module):
     def loss(self, pred, orig_pred):
         scale_factor = 1.0/self.x.shape[0]
         pred_prob = torch.sigmoid(pred).to(self.device)
-        true_label_length = self.labels[self.labels==1].shape[0]
-        preds_labels = list(pred_prob[0].detach().cpu().numpy().argsort()[-true_label_length:][::-1])
-        pred_prob_binary = pred_prob.clone().detach()
-        pred_prob_binary[0][preds_labels]=1
-        pred_prob_binary[pred_prob_binary!=1]=0
+        # orig_pred_prob = torch.sigmoid(orig_pred).to(self.device)
+        # true_label_length = self.labels[self.labels==1].shape[0]
+        # preds_labels = list(pred_prob[0].detach().cpu().numpy().argsort()[-true_label_length:][::-1])
+        preds_labels = np.where((orig_pred[0]>0.5).detach().cpu().numpy())
+        with torch.no_grad():
+            pred_prob_binary = orig_pred.clone().detach()
+            pred_prob_binary[pred_prob_binary>0.5]=1
+            pred_prob_binary[pred_prob_binary<=0.5]=0
         if self.mode == 'promote':
             other = ((1.0-self.labels)*pred_prob).max(1)[0]
             real = pred_prob[self.labels==1]
