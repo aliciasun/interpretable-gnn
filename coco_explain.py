@@ -169,7 +169,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
                 
             if args.mode == 'preserve':
-                mask_to_add = np.zeros(orig_A.shape[0])
+                # mask_to_add = np.zeros(orig_A.shape[0],orig_A.shape[0])
                 max_index=utils.largest_indices(mask_to_keep,10)
                 threshold_mask = mask_to_keep.copy()
                 threshold_mask[max_index] = 1
