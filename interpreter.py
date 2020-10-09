@@ -61,7 +61,7 @@ class GNNInterpreter(nn.Module):
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
             with torch.no_grad():
                 mask[self.budget>0]=0
-            self.mask = mask
+            self.mask = torch.nn.Parameter(mask.to(self.device))
             self.mask_existing = self.mask*(self.budget<0)
             self.mask_to_add = torch.zeros_like(self.mask)
             self.l_existing = 0.001
