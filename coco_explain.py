@@ -329,7 +329,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             
 def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
-    masked_adj = masked_adj*(1-torch.eye(masked_adj.shape[0]))
+    # masked_adj = masked_adj*(1-torch.eye(masked_adj.shape[0]))
     device = torch.device("cuda:0" if use_cuda else "cpu")
     # if args.mode != 'preserve':
     #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
