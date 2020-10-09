@@ -154,7 +154,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     interpreter.mask.grad.data[interpreter.budget>0]= 0
                 elif args.mode == 'promote_v2':
                     interpreter.mask.grad.data[interpreter.budget<0]= 0
-                interpreter.mask.grad.data.fill_diagonal_(0)
+                interpreter.mask.grad.data = interpreter.mask.grad.data*(1-torch.eye(interpreter.mask.grad.shape[0]))
+                # interpreter.mask.grad.data.fill_diagonal_(0)
                 # causal_edges = torch.transpose(interpreter.budget<0, 0,1)
                 # interpreter.mask.grad[causal_edges]=0
                 interpreter.optimizer.step()                
@@ -188,23 +189,18 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 masked_adj = np.zeros([80,80])
                 max_index=utils.largest_indices(to_keep,10)
                 masked_adj[max_index]=1
-                # threshold_mask = to_keep.copy()
-                # threshold_mask[max_index] = 1
-                # threshold_mask[threshold_mask<1] = 0
-                # masked_adj = threshold_mask
                 pred = get_pred_json_list(photo, feature, masked_adj, args)
                 new_pred_prob = pred
                 pred_list.append(pred)
                 new_pred_prob = pred_list
-                # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
                 pred_list = []
-                for i in range(5):
+                for i in range(1,5):
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
                     masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-                    pred = get_pred_json_list(photo, feature, masked_adj_smooth, args)
+                    pred = get_pred_json_list(photo, feature, masked_adj_smooth, args, true_labels)
                     pred_list.append(pred)
                     
                 # max_index=utils.largest_indices(to_add,3)
@@ -223,8 +219,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # masked_adj[max_index[0][1],max_index[1][1]] = 1
                 # pred = get_pred_json_list(photo, feature, masked_adj, args)
                 # pred_list.append(pred)
-                masked_adj = interpreter.masked_adj.detach()
-                pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
+                masked_adj = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
+                pred = get_pred_json_list(photo, feature, masked_adj, args, true_labels)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
 
@@ -331,6 +327,7 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
     # masked_adj = masked_adj*(1-torch.eye(masked_adj.shape[0]))
     device = torch.device("cuda:0" if use_cuda else "cpu")
+    
     # if args.mode != 'preserve':
     #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
     # else:
@@ -343,8 +340,10 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
         new_preds = list(np.where(new_pred_list>0.5)[0])
         top_index = np.argmax(new_pred_list)
         new_preds.append(top_index)
-    elif args.mode == 'promote':
-        new_preds = np.where(new_pred_list>0.4)[0]
+    elif args.mode == 'promote_v2':
+        true_label_length = len(orig_pred)
+        # new_preds = np.where(new_pred_list>0.1)[0]
+        new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
     else:
         new_preds = np.where(new_pred_list>0.5)[0]
     prob = [new_pred_list[i] for i in new_preds]

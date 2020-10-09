@@ -56,7 +56,7 @@ class GNNInterpreter(nn.Module):
             self.mask_to_add = self.mask*(self.budget>0)
             self.mask_existing = torch.zeros_like(self.mask)
             self.l_new = 0.0005
-            self.confidence = 0.5
+            self.confidence = 0.2
         elif args.mode == 'preserve' or args.mode == 'group':
             mask, mask_bias = self._initialize_mask(init_strategy='const', const=0.5)
             with torch.no_grad():
@@ -118,6 +118,7 @@ class GNNInterpreter(nn.Module):
         elif self.mode == 'promote_v2':
             self.mask_new = mask*(self.budget>0)
             masked_adj = self.adj + self.mask_new*self.budget*self.diagonal_mask
+            masked_adj = masked_adj * 0.25 / ((torch.sum(masked_adj, dim =0, keepdim=True) + 1e-6))
         else:
             masked_adj = self.adj + mask*self.budget*self.diagonal_mask
             self.mask_existing = mask*(self.budget<0)
