@@ -57,8 +57,8 @@ def evaluate(labels, preds, adj, mask, args, n=10, k=2):
     num_hit_pred, num_hit_real = 0,0
     num_rel_pred, num_rel_real = 0,0
     
-    num_rel_real, _ = count_relevant_edges(labels, adj, k=2)
-    num_rel_pred,_ = count_relevant_edges(preds, adj, k=2)
+    num_rel_real, _ = count_relevant_edges(labels, adj, k=1)
+    num_rel_pred,_ = count_relevant_edges(preds, adj, k=1)
     if args.mode != 'promote_v2':
         for idx in zip(max_index[0],max_index[1]):
             if idx[0] in labels_set and idx[1] in labels_set:
@@ -94,7 +94,7 @@ def evaluate_add_edges(adj, num_add = 5):
             mask[max_index] = 1
             mask[mask<1] = 0
             new_adj = adj+mask
-            n, p = count_relevant_edges(labels, new_adj, k=2)
+            n, p = count_relevant_edges(labels, new_adj, k=1)
             num_paths = np.zeros([1,N])
             num_edges = np.zeros([1,N])
             for t in range(N):
@@ -106,7 +106,7 @@ def evaluate_add_edges(adj, num_add = 5):
                     if alt_adj[r,c]==0:
                         alt_adj[r,c]=1
                         valid_edge+=1
-                an, ap = count_relevant_edges(labels, alt_adj, k=2)
+                an, ap = count_relevant_edges(labels, alt_adj, k=1)
                 num_edges[0,t] = an
                 num_paths[0,t] = ap
             s = percentileofscore(num_edges[0,:],n)
