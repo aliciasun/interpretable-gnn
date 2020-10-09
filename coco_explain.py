@@ -163,12 +163,15 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
             mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
             mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
-            
+            if args.print:
+                print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
+                print('-------------------------------------------')
+                print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
                 
             if args.mode == 'preserve':
                 mask_to_add = np.zeros(orig_A.shape[0])
                 max_index=utils.largest_indices(mask_to_keep,10)
-                threshold_mask = mask_to_keep.clone()
+                threshold_mask = mask_to_keep.copy()
                 threshold_mask[max_index] = 1
                 threshold_mask[threshold_mask<1] = 0
                 masked_adj = threshold_mask
@@ -195,6 +198,9 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             new_pred = torch.sigmoid(new_pred)
             new_pred_list = new_pred[0].cpu().detach().numpy()
             new_preds = np.where(new_pred_list>0.5)[0]
+            new_pred_prob={i:new_pred_list[i] for i in new_preds}
+            new_predicted_labels = [idx2label[l] for l in new_preds]
+            print("predict label.....",new_predicted_labels)
             # new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
             
             if args.save_mask:
@@ -202,20 +208,11 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
                 file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
                 utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
-            new_pred_prob={i:new_pred_list[i] for i in new_preds}
-            new_predicted_labels = [idx2label[l] for l in new_preds]
-            print("predict label.....",new_predicted_labels)
             
             common_object = len(list(set(preds).intersection(new_preds)))
             common_pred.append(common_object/len(preds))
             common_object_real = len(list(set(label_idx).intersection(new_preds)))
             common_real.append(common_object_real/len(true_labels))
-           
-            if args.print:
-                print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
-                print('-------------------------------------------')
-                print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
-                
             del photo
             del feature
             torch.cuda.empty_cache()
