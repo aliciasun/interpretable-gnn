@@ -91,12 +91,18 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     model.to(device)
+    
+    img_list_path = 'img_list.txt'
+    img_names = utils.parse_img_names(img_list_path)
+    
     for i, (inp, target) in enumerate(val_loader):
-        if i>50:
-           break
+        # if i>50:
+        #    break
         print("training for image: {0}".format(i))
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
+        if img_path not in img_names:
+            continue
            
         if args.dataset == 'coco':
             feature=Variable(inp[2], requires_grad=True).float().to(device)
@@ -156,58 +162,95 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # if args.mode == 'preserve' or args.mode == 'promote_v2':
                 #     mask_to_add = interpreter.mask_to_add.detach()
                 # else:
-                mask_existing = mask*(interpreter.budget<0)
-                mask_to_add = mask*(interpreter.budget>0)
+                mask_existing = mask*(interpreter.budget<0).detach()
+                mask_to_add = mask*(interpreter.budget>0).detach()
                 if step%10 == 0:
                     print('[iter:%d] to_remove mask weight: %.3f to_add mask weight: %.3f loss: %.3f' %
                     (step, torch.norm(mask_existing, p=1), torch.norm(mask_to_add, p=1),torch.sum(loss)))
-            mask_to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
-            mask_to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
+            to_add = mask_to_add.cpu().numpy()*(1-np.eye(orig_A.shape[0]))
+            to_keep = (orig_A-mask_existing.cpu().numpy())*(1-np.eye(orig_A.shape[0]))
             if args.print:
-                print(*utils.get_top_k_pairs(mask_to_keep, idx2label, k=10), sep = "\n")
+                print(*utils.get_top_k_pairs(to_keep, idx2label, k=10), sep = "\n")
                 print('-------------------------------------------')
-                print(*utils.get_top_k_pairs(mask_to_add, idx2label, k=10), sep = "\n")
-                
+                print(*utils.get_top_k_pairs(to_add, idx2label, k=10), sep = "\n")
+            if args.save_mask:
+                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
+                    np.savez(f, to_keep = to_keep, to_add =to_add)
+            
+            #compute prediction under mask
             if args.mode == 'preserve':
-                # mask_to_add = np.zeros(orig_A.shape[0],orig_A.shape[0])
-                max_index=utils.largest_indices(mask_to_keep,10)
-                threshold_mask = mask_to_keep.copy()
-                threshold_mask[max_index] = 1
-                threshold_mask[threshold_mask<1] = 0
-                masked_adj = threshold_mask
+                masked_adj = np.zeros([80,80])
+                max_index=utils.largest_indices(to_keep,10)
+                masked_adj[max_index]=1
+                # threshold_mask = to_keep.copy()
+                # threshold_mask[max_index] = 1
+                # threshold_mask[threshold_mask<1] = 0
+                # masked_adj = threshold_mask
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                new_pred_prob = pred
                 # mask_to_keep = orig_A
             if args.mode == 'promote_v2':
-                max_index=utils.largest_indices(mask_to_add,2)
-                threshold_mask = mask_to_add.copy()
-                threshold_mask[max_index] = 1
-                threshold_mask[threshold_mask<1] = 0
-                masked_adj = orig_A+threshold_mask
+                pred_list = []
+                max_index=utils.largest_indices(to_add,2)
+                masked_adj = orig_A.copy()
+                print(max_index[0][0])
+                masked_adj[max_index[0][0],max_index[1][0]] = 1
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+
+                masked_adj = orig_A.copy()
+                masked_adj[max_index[0][1],max_index[1][1]] = 1
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+
+                masked_adj = orig_A.copy()
+                masked_adj[max_index[0][0],max_index[1][0]] = 1
+                masked_adj[max_index[0][1],max_index[1][1]] = 1
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+                new_pred_prob = pred_list
+
             if args.mode == 'attack':
-                #keep 2 modified edges, 1 add, 1 attack
-                max_index_to_keep=utils.largest_indices(mask_to_keep,1)
-                max_index_to_add=utils.largest_indices(mask_to_add,1)
-                mask_to_keep[max_index_to_keep] = 1
-                mask_to_add[mask_to_add<1] = 0
-                masked_adj = orig_A+mask_to_add
+                pred_list = []
+                masked_adj = orig_A.copy()
+                #keep 2 modified edges, 1 add, 1 attack, first remove, then add
+                max_index_to_remove=utils.largest_indices(mask_existing.cpu().numpy(),1)
+                max_index_to_add=utils.largest_indices(to_add,1)
+
+                masked_adj = orig_A.copy()
+                masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+
+                masked_adj = orig_A.copy()
+                masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+
+                masked_adj = orig_A.copy()
+                masked_adj[max_index_to_remove[0][0],max_index_to_add[1][0]] = 0
+                masked_adj[max_index_to_add[0][0],max_index_to_add[1][0]] = 1
+                pred = get_pred_json_list(photo, feature, masked_adj)
+                pred_list.append(pred)
+                new_pred_prob = pred_list
+            new_preds = pred.keys()
             # if args.mode == 'preserve' or args.mode == 'promote_v2':
             #     # masked_adj_smooth = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
             # else:
             #     masked_adj_smooth = interpreter.masked_adj.detach()
-            masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-            new_pred=model(photo, feature, adj = masked_adj_smooth)
-            new_pred = torch.sigmoid(new_pred)
-            new_pred_list = new_pred[0].cpu().detach().numpy()
-            new_preds = np.where(new_pred_list>0.5)[0]
-            new_pred_prob={i:new_pred_list[i] for i in new_preds}
-            new_predicted_labels = [idx2label[l] for l in new_preds]
-            print("predict label.....",new_predicted_labels)
+            # masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
+            # new_pred=model(photo, feature, adj = masked_adj_smooth)
+            # new_pred = torch.sigmoid(new_pred)
+            # new_pred_list = new_pred[0].cpu().detach().numpy()
+            # new_preds = np.where(new_pred_list>0.5)[0]
+            # new_pred_prob={i:new_pred_list[i] for i in new_preds}
+            # new_predicted_labels = [idx2label[l] for l in new_preds]
+            # print("predict label.....",new_predicted_labels)
             # new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
             
-            if args.save_mask:
-                with open('mask_interpreter/mask/{}/{}.npz'.format(args.mode, img_path), 'wb') as f:
-                    np.savez(f, to_keep = mask_to_keep, to_add =mask_to_add)
+            if args.save_json:
                 file_name = 'mask_interpreter/json/{}/{}.json'.format(args.mode,img_path)
-                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, mask_to_keep, mask_to_add)
+                utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, to_keep, to_add)
             
             common_object = len(list(set(preds).intersection(new_preds)))
             common_pred.append(common_object/len(preds))
@@ -253,7 +296,20 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 #     print("average performance real after add: {0}".format(statistics.mean(perf_real_add)))
                 #     print("average performance pred after add: {0}".format(statistics.mean(perf_pred_add)))
             
-
+def get_pred_json_list(photo, feature, masked_adj):
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda else "cpu")
+    masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
+    new_pred=model(photo, feature, adj = masked_adj_smooth)
+    new_pred = torch.sigmoid(new_pred)
+    new_pred_list = new_pred[0].cpu().detach().numpy()
+    new_preds = np.where(new_pred_list>0.5)[0]
+    prob = [new_pred_list[i] for i in new_preds]
+    new_pred_prob={i:new_pred_list[i] for i in new_preds}
+    new_predicted_labels = [idx2label[l] for l in new_preds]
+    print("predict label.....",new_predicted_labels)
+    print("predict prob.....",prob)
+    return new_pred_prob
 
 if __name__ == "__main__":
    
@@ -284,6 +340,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save-mask", 
         dest="save_mask", 
+        action="store_const", 
+        const=True,
+        default=False, 
+        help="whether to save mask"
+    )
+    parser.add_argument(
+        "--save-json", 
+        dest="save_json", 
         action="store_const", 
         const=True,
         default=False, 

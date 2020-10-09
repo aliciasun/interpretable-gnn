@@ -190,11 +190,13 @@ def save_adj_to_json(file_name, pred, new_pred, to_keep, to_add):
                     tmp_list.append(0)
                 else:
                     tmp_list.append([adj_reorder[i,j],ops[i,j]])
-            edge_list.append(tmp_list)     
+            edge_list.append(tmp_list)      
     json_data = {}
     
     json_data["original_predict"] = [{str(label2id[idx2label[k]]):str(v)} for k,v in pred.items()]
-    json_data["new_predict"] = [{str(label2id[idx2label[k]]):str(v)} for k,v in new_pred.items()]
+    json_data["new_predict"] = []
+    for pred in new_pred:
+        json_data["new_predict"].append([{str(label2id[idx2label[k]]):str(v)} for k,v in pred.items()])
 
     json_data["links"] = edge_list
     j = json.dumps(json_data)

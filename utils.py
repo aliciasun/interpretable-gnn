@@ -388,3 +388,19 @@ def calculate_gender(gender):
     # f2 = open(file_name, 'w')
     # f2.write(json)
     # f2.close()
+
+
+def parse_img_names(img_list_path):
+
+    PREFIX = "COCO_val2014_"
+
+    with open(img_list_path) as f:
+        lines = f.readlines()
+
+    names = set()
+    for line in lines:
+        _id = int(line.strip())
+        names.add(f'{PREFIX}{_id:012}')
+
+    return names
+    
