@@ -203,7 +203,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
-                    pred = get_pred_json_list(photo, feature, masked_adj, args)
+                    masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
+                    pred = get_pred_json_list(photo, feature, masked_adj_smooth, args)
                     pred_list.append(pred)
                     
                 # max_index=utils.largest_indices(to_add,3)
@@ -222,7 +223,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 # masked_adj[max_index[0][1],max_index[1][1]] = 1
                 # pred = get_pred_json_list(photo, feature, masked_adj, args)
                 # pred_list.append(pred)
-                masked_adj = interpreter.masked_adj.detach().cpu().numpy()
+                masked_adj = interpreter.masked_adj.detach()
                 pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
@@ -328,13 +329,13 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
             
 def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
-    masked_adj = masked_adj*(1-np.eye(masked_adj.shape[0]))
+    masked_adj = masked_adj*(1-torch.eye(masked_adj.shape[0]))
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    if args.mode != 'preserve':
-        masked_adj_smooth = torch.Tensor(masked_adj).to(device)
-    else:
-        masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-    new_pred=model(photo, feature, adj = masked_adj_smooth)
+    # if args.mode != 'preserve':
+    #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
+    # else:
+    #     masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
+    new_pred=model(photo, feature, adj = masked_adj)
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
     top_index = 0
