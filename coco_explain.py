@@ -336,16 +336,17 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
     top_index = 0
-    if args.mode == 'attack':
-        new_preds = list(np.where(new_pred_list>0.5)[0])
-        top_index = np.argmax(new_pred_list)
-        new_preds.append(top_index)
-    elif args.mode == 'promote_v2':
-        true_label_length = len(orig_pred)
-        # new_preds = np.where(new_pred_list>0.1)[0]
-        new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
-    else:
-        new_preds = np.where(new_pred_list>0.5)[0]
+    # if args.mode == 'attack':
+    #     new_preds = list(np.where(new_pred_list>0.5)[0])
+    #     top_index = np.argmax(new_pred_list)
+    #     new_preds.append(top_index)
+    # elif args.mode == 'promote_v2':
+    #     true_label_length = len(orig_pred)
+    #     # new_preds = np.where(new_pred_list>0.1)[0]
+    #     new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
+    # else:
+    #     new_preds = np.where(new_pred_list>0.5)[0]
+    new_preds = new_pred_list
     prob = [new_pred_list[i] for i in new_preds]
     new_pred_prob={i:new_pred_list[i] for i in new_preds}
     new_predicted_labels = [idx2label[l] for l in new_preds]
