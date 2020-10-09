@@ -195,7 +195,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 new_pred_prob = pred_list
             if args.mode == 'promote_v2':
                 pred_list = []
-                for i in range(1,5):
+                for i in range(1,6):
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
@@ -332,7 +332,7 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
     # else:
     #     masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-    new_pred=model(photo, feature, adj = masked_adj)
+    new_pred=model(photo, feature, adj = torch.Tensor(masked_adj).to(device))
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
     top_index = 0
@@ -346,12 +346,14 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     #     new_preds = list(new_pred_list.argsort()[-true_label_length:][::-1])
     # else:
     #     new_preds = np.where(new_pred_list>0.5)[0]
-    new_preds = new_pred_list
-    prob = [new_pred_list[i] for i in new_preds]
-    new_pred_prob={i:new_pred_list[i] for i in new_preds}
+    # new_preds = new_pred_list
+    # prob = [new_pred_list[i] for i in new_preds]
+    # new_pred_prob={i:new_pred_list[i] for i in new_preds}
+    new_preds = np.where(new_pred_list>0.5)[0]
     new_predicted_labels = [idx2label[l] for l in new_preds]
+    new_pred_prob={i:new_pred_list[i] for i in range(len(new_pred_list))}
     print("predict label.....",new_predicted_labels)
-    print("predict prob.....",prob)
+    # print("predict prob.....",prob)
     return new_pred_prob
 
 if __name__ == "__main__":
