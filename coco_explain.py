@@ -330,10 +330,10 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
     masked_adj = masked_adj*(1-np.eye(masked_adj.shape[0]))
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    # if args.mode != 'preserve':
-    #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
-    # else:
-    masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
+    if args.mode != 'preserve':
+        masked_adj_smooth = torch.Tensor(masked_adj).to(device)
+    else:
+        masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
     new_pred=model(photo, feature, adj = masked_adj_smooth)
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
