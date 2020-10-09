@@ -195,7 +195,7 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 new_pred_prob = pred_list
             if args.mode == 'promote_v2':
                 pred_list = []
-                for i in range(1,6):
+                for i in range(1,10):
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
