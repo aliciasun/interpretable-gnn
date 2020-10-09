@@ -70,9 +70,9 @@ class GNNInterpreter(nn.Module):
             self.mask = torch.nn.Parameter(mask.to(self.device))
             self.mask_to_add = self.mask*(self.budget>0)
             self.mask_existing = self.mask*(self.budget<0)
-            self.l_existing = 0.005
+            self.l_existing = 0.01
             self.l_new = 0.005
-            self.confidence = 0.1
+            self.confidence = 0.2
         else:
             pass
         self.mask.to(self.device)
@@ -156,7 +156,8 @@ class GNNInterpreter(nn.Module):
             loss = loss_pred - self.l_existing*torch.norm(self.mask_existing, p=1)
         elif self.mode == 'attack':
             real = pred_prob[pred_prob_binary==1].max()
-            other = ((1.0-pred_prob_binary)*pred_prob).max(1)[0]
+            # other = ((1.0-pred_prob_binary)*pred_prob).max(1)[0]
+            other = pred_prob[pred_prob_binary==0].max()
             loss_counter = torch.clamp(other-real, max = self.confidence)
             loss = scale_factor*torch.sum(loss_counter)-self.l_existing*torch.norm(self.mask_existing, p=1) -\
             self.l_new*torch.norm(self.mask_to_add, p=1)
