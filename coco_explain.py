@@ -96,14 +96,13 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     img_names = utils.parse_img_names(img_list_path)
     
     for i, (inp, target) in enumerate(val_loader):
-        # if i>50:
-        #    break
+        if i<747:
+            continue
         
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
-        if img_path not in img_names:
-            if i%100!=0:
-                continue
+        #if img_path not in img_names:
+        #    continue
         print("training for image: {0}".format(i))
         if args.dataset == 'coco':
             feature=Variable(inp[2], requires_grad=True).float().to(device)
@@ -281,7 +280,10 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 utils_viz.save_adj_to_json(file_name, pred_prob, new_pred_prob, to_keep, to_add)
             
             common_object = len(list(set(preds).intersection(new_preds)))
-            common_pred.append(common_object/len(preds))
+            if len(preds)==0:
+                common_pred.append(0)
+            else:
+                common_pred.append(common_object/len(preds))
             common_object_real = len(list(set(label_idx).intersection(new_preds)))
             common_real.append(common_object_real/len(true_labels))
             del photo

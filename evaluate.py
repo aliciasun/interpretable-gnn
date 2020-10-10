@@ -77,10 +77,12 @@ def evaluate_add_edges(adj, num_add = 5):
     # for i in range(len(files)):
     anno_path = os.path.join('data/coco_gender', '{}_anno.json'.format('val'))
     anno = json.load(open(anno_path))
-    num_images = len(anno)
+    #num_images = len(anno)
+    num_images = len([name for name in os.listdir('mask_interpreter/mask/promote_v2')])
+    print("number of masks: {0}".format(num_images))
     res_edge = np.zeros([num_add, num_images])
     res_path = np.zeros([num_add, num_images])
-    for i in tqdm(range(len(anno))):
+    for i in tqdm(range(num_images)):
         labels = anno[i]['labels']
         img_name = anno[i]['file_name'][:-4]
         # mask_path = 'mask_interpreter/mask/promote/COCO_val2014_000000009727.npz'
