@@ -7,6 +7,7 @@ from utils import largest_indices, get_neighbor_with_k_hops
 from scipy.stats import percentileofscore
 
 from models import gen_A
+import torch
 
 
 label_dic ={"airplane": 0, 
@@ -111,11 +112,35 @@ def evaluate_add_edges(adj, num_add = 5):
                 an, ap = count_relevant_edges(labels, alt_adj, k=2)
                 num_edges[0,t] = an
                 num_paths[0,t] = ap
-            s = percentileofscore(num_edges,n,kind='weak')
-            sp = percentileofscore(num_paths,p,kind='weak')
+            s = percentileofscore(num_edges[0,:],n,kind='weak')
+            sp = percentileofscore(num_paths[0,:],p,kind='weak')
             res_edge[k,i] = s
             res_path[k,i] = sp
     return res_edge, res_path
+
+
+def average_precision(output, target, difficult_examples=True):
+    # sort examples
+    sorted, indices = torch.sort(output, dim=0, descending=True)
+    # Computes prec@i
+    pos_count = 0.
+    total_count = 0.
+    precision_at_i = 0.
+    indices = indices[:3]
+    for i in indices:
+        label = target[i]
+        if difficult_examples and label == 0:
+            continue
+        if label == 1:
+            pos_count += 1
+        total_count += 1
+        if label == 1:
+            precision_at_i += pos_count / total_count
+    if pos_count == 0:
+        precision_at_i = 0
+    else:
+        precision_at_i /= pos_count
+    return precision_at_i
 
 if __name__ == "__main__":
     adj=gen_A(num_classes=80,t=0.4, adj_file='data/coco/coco_adj.pkl', p=1)

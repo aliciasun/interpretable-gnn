@@ -27,7 +27,7 @@ import utils_viz
 from dataset import CocoGender, COCO2014
 from models import gcn_resnet101, Warp, gen_A
 from interpreter import GNNInterpreter, smooth_adj
-from evaluate import evaluate, evaluate_faithfulness
+from evaluate import evaluate, evaluate_faithfulness, average_precision
 import statistics
 
 
@@ -86,7 +86,7 @@ def explain_group(model, val_loader, orig_A, target_label, subgroup, args, metho
 def explain(model, val_loader, orig_A, args, method = 'mask'):
     hit_pred, hit_real = [], []
     perf_pred, perf_real = [], []
-    perf_pred_add, perf_real_add = [], []
+    ap = []
     common_pred, common_real = [], []
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -96,9 +96,6 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
     img_names = utils.parse_img_names(img_list_path)
     
     for i, (inp, target) in enumerate(val_loader):
-        if i<747:
-            continue
-        
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
         #if img_path not in img_names:
@@ -190,37 +187,21 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 max_index=utils.largest_indices(to_keep,10)
                 masked_adj[max_index]=1
                 masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-                pred = get_pred_json_list(photo, feature, masked_adj_smooth, args)
+                pred, output = get_pred_json_list(photo, feature, masked_adj_smooth, args)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
             if args.mode == 'promote_v2':
                 pred_list = []
-                for i in range(1,11):
+                for i in [5]:
                     max_index=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index[0],max_index[1]] = 1
                     masked_adj_smooth = torch.Tensor(smooth_adj(masked_adj)).to(device)
-                    pred = get_pred_json_list(photo, feature, masked_adj_smooth, args, true_labels)
+                    pred,output = get_pred_json_list(photo, feature, masked_adj_smooth, args, true_labels)
                     pred_list.append(pred)
-                    
-                # max_index=utils.largest_indices(to_add,3)
-                # masked_adj = orig_A.copy()
-                # masked_adj[max_index[0],max_index[1]] = 1
-                # pred = get_pred_json_list(photo, feature, masked_adj, args)
-                # pred_list.append(pred)
-
-                # masked_adj = orig_A.copy()
-                # masked_adj[max_index[0][1],max_index[1][1]] = 1
-                # pred = get_pred_json_list(photo, feature, masked_adj, args)
-                # pred_list.append(pred)
-
-                # masked_adj = orig_A.copy()
-                # masked_adj[max_index[0][0],max_index[1][0]] = 1
-                # masked_adj[max_index[0][1],max_index[1][1]] = 1
-                # pred = get_pred_json_list(photo, feature, masked_adj, args)
-                # pred_list.append(pred)
+                
                 masked_adj = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
-                pred = get_pred_json_list(photo, feature, masked_adj, args, true_labels)
+                pred,_ = get_pred_json_list(photo, feature, masked_adj, args, true_labels)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
 
@@ -231,33 +212,17 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 max_index_to_remove=utils.largest_indices(mask_existing,10)
                 max_index_to_add=utils.largest_indices(to_add,10)
                 masked_adj = orig_A.copy()
-                for i in range(1,11):
+                for i in [5]:
                     max_index_to_remove=utils.largest_indices(mask_existing,i)
                     max_index_to_add=utils.largest_indices(to_add,i)
                     masked_adj = orig_A.copy()
                     masked_adj[max_index_to_add[0],max_index_to_add[1]] = 1
                     masked_adj[max_index_to_remove[0],max_index_to_remove[1]] = 0
-                    pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
+                    pred,output = get_pred_json_list(photo, feature, masked_adj, args, preds)
                     pred_list.append(pred)
-
-                # masked_adj[max_index_to_remove[0],max_index_to_remove[1]] = 0
-                # pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
-                # pred_list.append(pred)
-
-                # masked_adj = orig_A.copy()
-                # masked_adj[max_index_to_add[0],max_index_to_add[1]] = 1
-                # pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
-                # pred_list.append(pred)
-
-                # masked_adj = orig_A.copy()
-                # masked_adj[max_index_to_remove[0],max_index_to_remove[1]] = 0
-                # masked_adj[max_index_to_add[0],max_index_to_add[1]] = 1
-                # pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
-                # pred_list.append(pred)
-
                 masked_adj = orig_A.copy()
-                masked_adj = interpreter.masked_adj.detach().cpu().numpy()
-                pred = get_pred_json_list(photo, feature, masked_adj, args, preds)
+                masked_adj = torch.Tensor(smooth_adj(interpreter.masked_adj.detach().cpu().numpy())).to(device)
+                pred,_ = get_pred_json_list(photo, feature, masked_adj, args, preds)
                 pred_list.append(pred)
                 new_pred_prob = pred_list
             new_preds = pred.keys()
@@ -294,9 +259,12 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
         print("common pred: {0}".format(statistics.mean(common_pred)))
         print("common real: {0}".format(statistics.mean(common_real)))
         if args.evaluate:
+
+            precision = average_precision(output[0], target[0])
+            ap.append(precision)
             for k in [1,2]:
                 print("evaluating on {0}-hop neighbors".format(k))
-                num_rel_real, num_rel_pred, num_hit_real, num_hit_pred = evaluate(label_idx, preds, orig_A, mask_to_keep, args,k=k)
+                num_rel_real, num_rel_pred, num_hit_real, num_hit_pred = evaluate(label_idx, preds, orig_A, to_keep, args,k=k)
                 # if args.mode == 'promote_v2':
                 #     num_rel_real_add, num_rel_pred_add, _, _ = evaluate(label_idx, preds, orig_A, mask_to_add+mask_to_keep,args, k=k)
                 if num_rel_pred != 0 :
@@ -310,8 +278,10 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
                 print("number of relevent real edges: {0}".format(num_rel_real))
                 print("number of hit predict edges: {0}".format(num_hit_pred))
                 print("number of hit real edges: {0}".format(num_hit_real))
-                print("average performance pred: {0}".format(statistics.mean(perf_pred)))
-                print("average performance real: {0}".format(statistics.mean(perf_real)))
+                if i>=10:
+                    print("average performance pred: {0}".format(statistics.mean(perf_pred)))
+                    print("average performance real: {0}".format(statistics.mean(perf_real)))
+                print("map: {0}".format(statistics.mean(ap)))
                 # if args.mode == 'promote_v2':
                 #     print("number of relevent real edges after add: {0}".format(num_rel_real_add))
                 #     print("number of paths between real labels: {0}".format(num_path))
@@ -350,13 +320,14 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     # new_preds = new_pred_list
     # prob = [new_pred_list[i] for i in new_preds]
     # new_pred_prob={i:new_pred_list[i] for i in new_preds}
-    new_preds = np.where(new_pred_list>0.5)[0]
+    # new_preds = np.where(new_pred_list>0.5)[0]
+    new_preds = list(new_pred_list.argsort()[-3:][::-1])
     new_predicted_labels = [idx2label[l] for l in new_preds]
     new_pred_prob={i:new_pred_list[i] for i in range(len(new_pred_list))}
     prob = [new_pred_list[i] for i in new_preds]
     print("predict label.....",new_predicted_labels)
     print("predict prob.....",prob)
-    return new_pred_prob
+    return new_pred_prob, new_pred
 
 if __name__ == "__main__":
    
