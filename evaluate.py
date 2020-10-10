@@ -105,14 +105,14 @@ def evaluate_add_edges(adj, num_add = 5):
                 while valid_edge<(k+1):
                     r = np.random.randint(0, 80)
                     c = np.random.randint(0, 80)
-                    if alt_adj[r,c]==0:
+                    if r!=c and alt_adj[r,c]==0:
                         alt_adj[r,c]=1
                         valid_edge+=1
                 an, ap = count_relevant_edges(labels, alt_adj, k=1)
                 num_edges[0,t] = an
                 num_paths[0,t] = ap
-            s = percentileofscore(num_edges[0,:],n)
-            sp = percentileofscore(num_paths[0,:],p)
+            s = percentileofscore(num_edges[0,:],n,kind='weak')
+            sp = percentileofscore(num_paths[0,:],p,kind='weak')
             res_edge[k,i] = s
             res_path[k,i] = sp
     return res_edge, res_path
@@ -120,6 +120,7 @@ def evaluate_add_edges(adj, num_add = 5):
 if __name__ == "__main__":
     adj=gen_A(num_classes=80,t=0.4, adj_file='data/coco/coco_adj.pkl', p=1)
     res_edge, res_path = evaluate_add_edges(adj) 
+    # print(res_edge)
     print(np.mean(res_edge, axis=1))
     print(np.std(res_edge,axis=1))
     print(np.mean(res_path,axis=1))
