@@ -102,7 +102,8 @@ def explain(model, val_loader, orig_A, args, method = 'mask'):
         photo=Variable(inp[0], requires_grad=True).float().to(device)
         img_path = inp[1][0].split(".")[0]
         if img_path not in img_names:
-            continue
+            if i%100!=0:
+                continue
         print("training for image: {0}".format(i))
         if args.dataset == 'coco':
             feature=Variable(inp[2], requires_grad=True).float().to(device)
@@ -327,7 +328,6 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     use_cuda = torch.cuda.is_available()
     # masked_adj = masked_adj*(1-torch.eye(masked_adj.shape[0]))
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    
     # if args.mode != 'preserve':
     #     masked_adj_smooth = torch.Tensor(masked_adj).to(device)
     # else:
@@ -335,7 +335,6 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     new_pred=model(photo, feature, adj = torch.Tensor(masked_adj).to(device))
     new_pred = torch.sigmoid(new_pred)
     new_pred_list = new_pred[0].cpu().detach().numpy()
-    top_index = 0
     # if args.mode == 'attack':
     #     new_preds = list(np.where(new_pred_list>0.5)[0])
     #     top_index = np.argmax(new_pred_list)
@@ -352,8 +351,9 @@ def get_pred_json_list(photo, feature, masked_adj, args, orig_pred=None):
     new_preds = np.where(new_pred_list>0.5)[0]
     new_predicted_labels = [idx2label[l] for l in new_preds]
     new_pred_prob={i:new_pred_list[i] for i in range(len(new_pred_list))}
+    prob = [new_pred_list[i] for i in new_preds]
     print("predict label.....",new_predicted_labels)
-    # print("predict prob.....",prob)
+    print("predict prob.....",prob)
     return new_pred_prob
 
 if __name__ == "__main__":
