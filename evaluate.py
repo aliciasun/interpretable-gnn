@@ -96,7 +96,7 @@ def evaluate_add_edges(adj, num_add = 5):
             mask[max_index] = 1
             mask[mask<1] = 0
             new_adj = adj+mask
-            n, p = count_relevant_edges(labels, new_adj, k=1)
+            n, p = count_relevant_edges(labels, new_adj, k=2)
             num_paths = np.zeros([1,N])
             num_edges = np.zeros([1,N])
             for t in range(N):
@@ -108,11 +108,11 @@ def evaluate_add_edges(adj, num_add = 5):
                     if r!=c and alt_adj[r,c]==0:
                         alt_adj[r,c]=1
                         valid_edge+=1
-                an, ap = count_relevant_edges(labels, alt_adj, k=1)
+                an, ap = count_relevant_edges(labels, alt_adj, k=2)
                 num_edges[0,t] = an
                 num_paths[0,t] = ap
-            s = percentileofscore(num_edges[0,:],n,kind='weak')
-            sp = percentileofscore(num_paths[0,:],p,kind='weak')
+            s = percentileofscore(num_edges,n,kind='weak')
+            sp = percentileofscore(num_paths,p,kind='weak')
             res_edge[k,i] = s
             res_path[k,i] = sp
     return res_edge, res_path
